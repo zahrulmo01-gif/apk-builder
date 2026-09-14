@@ -29,51 +29,48 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Extract project.zip
         run: |
-          echo "Mengekstrak project.zip..."
           mkdir -p workspace
           unzip -o project.zip -d workspace
 
-      - name: Compile APK with Gradle
+      - name: Compile APK
         run: |
           cd workspace
           
-          # Cari folder yang berisi file Gradle
+          # Cari letak file build.gradle
           BUILD_DIR=$(find . -name "build.gradle*" -exec dirname {} \; | head -n 1)
           if [ -n "$BUILD_DIR" ]; then
-            echo "Masuk ke direktori build: $BUILD_DIR"
             cd "$BUILD_DIR"
           fi
 
-          echo "Struktur isi folder:"
+          echo "Direktori saat ini: $(pwd)"
           ls -la
 
-          # Generate wrapper jika belum ada
+          # Buat wrapper jika gradlew tidak ada
           if [ ! -f "gradlew" ]; then
-            echo "gradlew tidak ditemukan, membuat wrapper otomatis..."
+            echo "gradlew tidak ditemukan, membuat wrapper baru..."
             gradle wrapper
           fi
 
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-          # Siapkan folder output
+          # Pindahkan file APK ke folder output
           mkdir -p $GITHUB_WORKSPACE/output
           APK_PATH=$(find . -name "*.apk" | head -n 1)
 
           if [ -z "$APK_PATH" ]; then
-            echo "Error: File APK gagal terbentuk!"
+            echo "Gagal: File APK tidak ditemukan!"
             exit 1
           fi
 
-          echo "APK ditemukan di: $APK_PATH"
           cp "$APK_PATH" $GITHUB_WORKSPACE/output/app-debug.apk
 
-      - name: Upload APK to GitHub Release
+      - name: Upload APK to Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: latest
