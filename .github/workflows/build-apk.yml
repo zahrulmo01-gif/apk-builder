@@ -19,14 +19,19 @@ jobs:
 
       - name: Download & Extract Project ZIP
         run: |
-          curl -L -o project.zip "${{ github.event.client_payload.zip_url }}"
+          echo "Mengunduh file dari: ${{ github.event.client_payload.zip_url }}"
+          # Download dengan header browser agar tidak dicegat bot-blocker
+          curl -sSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+               -o project.zip "${{ github.event.client_payload.zip_url }}"
+          
+          # Cek apakah file benar-benar zip
+          head -c 10 project.zip
           mkdir -p workspace
           unzip -o project.zip -d workspace
 
       - name: Compile Debug APK
         run: |
           cd workspace
-          # Cari folder yang ada gradlew-nya
           GRADLE_DIR=$(find . -name "gradlew" -exec dirname {} \; | head -n 1)
           if [ -n "$GRADLE_DIR" ]; then
             cd "$GRADLE_DIR"
@@ -34,7 +39,6 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
           
-          # Pindahkan APK ke direktori atas
           mkdir -p $GITHUB_WORKSPACE/output
           APK_FILE=$(find . -name "*.apk" | head -n 1)
           cp "$APK_FILE" $GITHUB_WORKSPACE/output/app-debug.apk
