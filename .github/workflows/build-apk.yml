@@ -39,35 +39,43 @@ jobs:
 
       - name: Compile APK
         run: |
-          cd workspace
-          
-          # Cari letak file build.gradle
-          BUILD_DIR=$(find . -name "build.gradle*" -exec dirname {} \; | head -n 1)
-          if [ -n "$BUILD_DIR" ]; then
-            cd "$BUILD_DIR"
+          # 1. Cari letak file settings.gradle atau build.gradle di seluruh subfolder
+          PROJECT_ROOT=$(find workspace -name "settings.gradle*" -o -name "build.gradle*" | head -n 1 | xargs dirname)
+
+          if [ -z "$PROJECT_ROOT" ]; then
+            echo "Error: Tidak ditemukan file gradle di dalam project.zip!"
+            ls -R workspace
+            exit 1
           fi
 
-          echo "Direktori saat ini: $(pwd)"
-          ls -la
+          echo "Direktori proyek ditemukan di: $PROJECT_ROOT"
+          cd "$PROJECT_ROOT"
 
-          # Buat wrapper jika gradlew tidak ada
-          if [ ! -f "gradlew" ]; then
-            echo "gradlew tidak ditemukan, membuat wrapper baru..."
-            gradle wrapper
+          # 2. Cek apakah gradlew sudah ada
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew tidak ditemukan, inisialisasi wrapper menggunakan Gradle bawaan..."
+            gradle wrapper --gradle-version 8.4 || true
           fi
 
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          # 3. Eksekusi build (pakai gradlew jika berhasil dibuat, atau langsung perintah gradle runner)
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            echo "Menjalankan build langsung lewat binary gradle runner..."
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
 
-          # Pindahkan file APK ke folder output
+          # 4. Ambil output APK
           mkdir -p $GITHUB_WORKSPACE/output
           APK_PATH=$(find . -name "*.apk" | head -n 1)
 
           if [ -z "$APK_PATH" ]; then
-            echo "Gagal: File APK tidak ditemukan!"
+            echo "Error: File APK tidak ditemukan setelah build!"
             exit 1
           fi
 
+          echo "APK berhasil dibuat: $APK_PATH"
           cp "$APK_PATH" $GITHUB_WORKSPACE/output/app-debug.apk
 
       - name: Upload APK to Release
